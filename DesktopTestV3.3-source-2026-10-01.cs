@@ -13,8 +13,9 @@ using System.Windows.Forms;
 [assembly: System.Reflection.AssemblyFileVersion("1.2.3.0")]
 namespace DesktopTest {
     static class Profile {
+        internal const int MinimumSpeed = 1, MaximumSpeed = 20, DefaultSpeed = 6;
         internal static int Horizontal(long cycle) { return (cycle % 2 == 0) ? 2 : 3; }
-        internal static int FirstY(long elapsed) { return 8; }
+        internal static int FirstY(long elapsed, int speed) { return speed + 1; }
         internal static int SecondY(long elapsed) { return -1; }
     }
     // Requires right-then-left activation; releasing either button cancels.
@@ -48,19 +49,22 @@ namespace DesktopTest {
     }
     sealed class MainForm : Form {
         volatile bool running, enabled, closing;
+        volatile int downwardSpeed = Profile.DefaultSpeed;
         const int delay = 1;
         volatile string problem = "";
         long cycles;
         long downward;
         readonly Label state = new Label();
         readonly Label stats = new Label();
+        readonly Label movement = new Label();
+        readonly NumericUpDown speed = new NumericUpDown();
         readonly Button start = new Button();
         readonly System.Windows.Forms.Timer refresh = new System.Windows.Forms.Timer();
         readonly Thread worker;
 
         public MainForm() {
             Text = "桌面测试工具";
-            ClientSize = new Size(650, 470);
+            ClientSize = new Size(650, 520);
             Font = new Font("Microsoft YaHei UI", 10F);
             FormBorderStyle = FormBorderStyle.FixedSingle;
             MaximizeBox = false;
@@ -69,8 +73,17 @@ namespace DesktopTest {
             Label title = new Label { Text = "桌面测试工具", Font = new Font(Font.FontFamily, 19F, FontStyle.Bold), Location = new Point(26, 20), AutoSize = true };
             Controls.Add(title);
             Controls.Add(new Label { Text = "先点击“开始测试”，再按住右键，最后按住左键。\n光标会快速往返抖动，并持续向下移动。", Location = new Point(28, 75), Size = new Size(592, 58) });
-            Controls.Add(new Label { Text = "每步等待 1 毫秒；全程每轮向下 7 单位，左右幅度交替 2 / 3（平均 2.5）。", Location = new Point(28, 145), AutoSize = true });
-            start.Text = "开始测试"; start.Location = new Point(28, 190); start.Size = new Size(145, 42);
+            Controls.Add(new Label { Text = "每步等待 1 毫秒；左右幅度交替 2 / 3（平均 2.5），下拉数值越大越快。", Location = new Point(28, 145), AutoSize = true });
+            Controls.Add(new Label { Text = "下拉速度：", Location = new Point(28, 188), AutoSize = true });
+            speed.Location = new Point(128, 184); speed.Size = new Size(80, 30);
+            speed.Minimum = Profile.MinimumSpeed; speed.Maximum = Profile.MaximumSpeed;
+            speed.DecimalPlaces = 0; speed.Increment = 1; speed.Value = downwardSpeed;
+            speed.TextAlign = HorizontalAlignment.Center; speed.TabIndex = 0;
+            speed.AccessibleName = "下拉速度";
+            speed.ValueChanged += delegate { downwardSpeed = (int)speed.Value; RefreshStatus(); };
+            Controls.Add(speed);
+            Controls.Add(new Label { Text = "1–20 单位/轮，调整后立即生效", Location = new Point(224, 188), AutoSize = true });
+            start.Text = "开始测试"; start.Location = new Point(28, 235); start.Size = new Size(145, 42); start.TabIndex = 1;
             start.Click += delegate {
                 if (running) Stop();
                 else {
@@ -80,12 +93,13 @@ namespace DesktopTest {
                 RefreshStatus();
             };
             Controls.Add(start);
-            state.Location = new Point(193, 199); state.Size = new Size(420, 32); Controls.Add(state);
-            stats.Location = new Point(28, 245); stats.Size = new Size(580, 30); Controls.Add(stats);
-            Panel testArea = new Panel { Location = new Point(28, 286), Size = new Size(592, 75), BackColor = Color.FromArgb(226, 234, 243), BorderStyle = BorderStyle.FixedSingle };
-            testArea.Controls.Add(new Label { Text = "可在这块空白区域按右键 + 左键测试\n左右幅度按轮交替 2 / 3；每轮下 8、上 1，净下拉 7", AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter });
+            state.Location = new Point(193, 244); state.Size = new Size(420, 32); Controls.Add(state);
+            stats.Location = new Point(28, 290); stats.Size = new Size(580, 30); Controls.Add(stats);
+            Panel testArea = new Panel { Location = new Point(28, 331), Size = new Size(592, 75), BackColor = Color.FromArgb(226, 234, 243), BorderStyle = BorderStyle.FixedSingle };
+            movement.AutoSize = false; movement.Dock = DockStyle.Fill; movement.TextAlign = ContentAlignment.MiddleCenter;
+            testArea.Controls.Add(movement);
             Controls.Add(testArea);
-            Controls.Add(new Label { Text = "侧键 5：暂停 / 恢复　｜　窗口按钮：结束测试\n松开左键或右键立即停止移动。\n程序只移动光标，不会自动点击光标。", Location = new Point(28, 379), Size = new Size(596, 76) });
+            Controls.Add(new Label { Text = "侧键 5：暂停 / 恢复　｜　窗口按钮：结束测试\n松开左键或右键立即停止移动。\n程序只移动光标，不会自动点击光标。", Location = new Point(28, 424), Size = new Size(596, 76) });
             refresh.Interval = 100; refresh.Tick += delegate { RefreshStatus(); }; refresh.Start();
             worker = new Thread(Work); worker.IsBackground = true; worker.Start();
             FormClosing += delegate { closing = true; Stop(); refresh.Stop(); worker.Join(250); };
@@ -97,6 +111,8 @@ namespace DesktopTest {
             state.Text = problem.Length > 0 ? problem : !running ? "已停止 · 不移动光标" : enabled ? "已就绪 · 右键 + 左键触发" : "已暂停 · 5 号键恢复";
             long count = Interlocked.Read(ref cycles);
             stats.Text = "已完成 " + count + " 轮；累计向下输入 " + Interlocked.Read(ref downward) + " 单位";
+            int currentSpeed = downwardSpeed;
+            movement.Text = "可在这块空白区域按右键 + 左键测试\n每轮下 " + Profile.FirstY(0, currentSpeed) + "、上 1，净下拉 " + currentSpeed + " 单位";
         }
         bool CanMove() { return running && enabled && !closing && Native.Down(0x01) && Native.Down(0x02); }
         void Work() {
@@ -114,7 +130,7 @@ namespace DesktopTest {
                     if (!wasActive) { burst.Restart(); burstCycles = 0; }
                     int horizontal = Profile.Horizontal(burstCycles++);
                     long elapsed = burst.ElapsedMilliseconds;
-                    int firstY = Profile.FirstY(elapsed), secondY = Profile.SecondY(elapsed);
+                    int firstY = Profile.FirstY(elapsed, downwardSpeed), secondY = Profile.SecondY(elapsed);
                     if (!CanMove()) { trigger.Update(false, left, right); continue; }
                     if (!Native.Move(-horizontal, firstY)) { problem = "系统未接受光标输入，测试已停止"; Stop(); continue; }
                     Interlocked.Add(ref downward, firstY);
@@ -134,10 +150,10 @@ namespace DesktopTest {
             Check(Profile.Horizontal(0) == 2 && Profile.Horizontal(1) == 3, "Alternating displacement");
             Check(Profile.Horizontal(2) == 2 && Profile.Horizontal(3) == 3, "Alternation repeats");
             Check((Profile.Horizontal(0) + Profile.Horizontal(1)) / 2.0 == 2.5, "Mean horizontal amplitude");
-            Check(Profile.FirstY(0) + Profile.SecondY(0) == 7, "Initial displacement");
-            Check(Profile.FirstY(299) + Profile.SecondY(299) == 7, "Initial phase end");
-            Check(Profile.FirstY(300) + Profile.SecondY(300) == 7, "Phase transition");
-            Check(Profile.FirstY(10000) + Profile.SecondY(10000) == 7, "Sustained displacement");
+            Check(Profile.FirstY(0, Profile.DefaultSpeed) + Profile.SecondY(0) == 6, "Default displacement");
+            Check(Profile.FirstY(299, Profile.MinimumSpeed) + Profile.SecondY(299) == 1, "Minimum speed displacement");
+            Check(Profile.FirstY(300, 7) + Profile.SecondY(300) == 7, "Adjusted speed displacement");
+            Check(Profile.FirstY(10000, Profile.MaximumSpeed) + Profile.SecondY(10000) == 20, "Maximum speed displacement");
             Trigger t = new Trigger();
             Check(!t.Update(true, false, true), "Right alone");
             Check(t.Update(true, true, true), "Right then left");
