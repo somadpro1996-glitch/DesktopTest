@@ -14,7 +14,7 @@ using System.Windows.Forms;
 namespace DesktopTest {
     static class Profile {
         internal static int Horizontal(long cycle) { return (cycle % 2 == 0) ? 2 : 3; }
-        internal static int FirstY(long elapsed) { return 6; }
+        internal static int FirstY(long elapsed) { return 8; }
         internal static int SecondY(long elapsed) { return -1; }
     }
     // Requires right-then-left activation; releasing either button cancels.
@@ -69,7 +69,7 @@ namespace DesktopTest {
             Label title = new Label { Text = "桌面测试工具", Font = new Font(Font.FontFamily, 19F, FontStyle.Bold), Location = new Point(26, 20), AutoSize = true };
             Controls.Add(title);
             Controls.Add(new Label { Text = "先点击“开始测试”，再按住右键，最后按住左键。\n光标会快速往返抖动，并持续向下移动。", Location = new Point(28, 75), Size = new Size(592, 58) });
-            Controls.Add(new Label { Text = "每步等待 1 毫秒；全程每轮向下 5 单位，左右幅度交替 2 / 3（平均 2.5）。", Location = new Point(28, 145), AutoSize = true });
+            Controls.Add(new Label { Text = "每步等待 1 毫秒；全程每轮向下 7 单位，左右幅度交替 2 / 3（平均 2.5）。", Location = new Point(28, 145), AutoSize = true });
             start.Text = "开始测试"; start.Location = new Point(28, 190); start.Size = new Size(145, 42);
             start.Click += delegate {
                 if (running) Stop();
@@ -83,7 +83,7 @@ namespace DesktopTest {
             state.Location = new Point(193, 199); state.Size = new Size(420, 32); Controls.Add(state);
             stats.Location = new Point(28, 245); stats.Size = new Size(580, 30); Controls.Add(stats);
             Panel testArea = new Panel { Location = new Point(28, 286), Size = new Size(592, 75), BackColor = Color.FromArgb(226, 234, 243), BorderStyle = BorderStyle.FixedSingle };
-            testArea.Controls.Add(new Label { Text = "可在这块空白区域按右键 + 左键测试\n左右幅度按轮交替 2 / 3；每轮下 6、上 1，净下拉 5", AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter });
+            testArea.Controls.Add(new Label { Text = "可在这块空白区域按右键 + 左键测试\n左右幅度按轮交替 2 / 3；每轮下 8、上 1，净下拉 7", AutoSize = false, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleCenter });
             Controls.Add(testArea);
             Controls.Add(new Label { Text = "侧键 5：暂停 / 恢复　｜　窗口按钮：结束测试\n松开左键或右键立即停止移动。\n程序只移动光标，不会自动点击光标。", Location = new Point(28, 379), Size = new Size(596, 76) });
             refresh.Interval = 100; refresh.Tick += delegate { RefreshStatus(); }; refresh.Start();
@@ -134,10 +134,10 @@ namespace DesktopTest {
             Check(Profile.Horizontal(0) == 2 && Profile.Horizontal(1) == 3, "Alternating displacement");
             Check(Profile.Horizontal(2) == 2 && Profile.Horizontal(3) == 3, "Alternation repeats");
             Check((Profile.Horizontal(0) + Profile.Horizontal(1)) / 2.0 == 2.5, "Mean horizontal amplitude");
-            Check(Profile.FirstY(0) + Profile.SecondY(0) == 5, "Initial displacement");
-            Check(Profile.FirstY(299) + Profile.SecondY(299) == 5, "Initial phase end");
-            Check(Profile.FirstY(300) + Profile.SecondY(300) == 5, "Phase transition");
-            Check(Profile.FirstY(10000) + Profile.SecondY(10000) == 5, "Sustained displacement");
+            Check(Profile.FirstY(0) + Profile.SecondY(0) == 7, "Initial displacement");
+            Check(Profile.FirstY(299) + Profile.SecondY(299) == 7, "Initial phase end");
+            Check(Profile.FirstY(300) + Profile.SecondY(300) == 7, "Phase transition");
+            Check(Profile.FirstY(10000) + Profile.SecondY(10000) == 7, "Sustained displacement");
             Trigger t = new Trigger();
             Check(!t.Update(true, false, true), "Right alone");
             Check(t.Update(true, true, true), "Right then left");
