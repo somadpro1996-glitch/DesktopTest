@@ -1,0 +1,2 @@
+b8032fb49b4806fefbeabc357fbd44e62278b0df6270c2d075834fe9a8f35a6e  DesktopTest-v3.3-adjustable.exe
+d2a09f2733643a0601eb78e842d20aaae43d1a5487cea0cab48e1c085ebf6289  DesktopTest-v3.3-adjustable.zip
